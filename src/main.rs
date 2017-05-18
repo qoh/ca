@@ -1,5 +1,7 @@
 // #![feature(box_patterns)]
 
+extern crate num;
+
 use std::io::{self, BufRead, Write};
 
 mod parser;

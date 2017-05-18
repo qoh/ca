@@ -1,6 +1,9 @@
 use std::iter::Peekable;
 use std::str::Chars;
 
+use num::{BigInt, BigRational};
+use num::bigint::ToBigInt;
+
 #[derive(Debug, PartialEq)]
 pub enum Symbol {
 	Add,
@@ -11,7 +14,7 @@ pub enum Symbol {
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
-	Integer(i32),
+	Integer(BigRational),
 	Operator(Symbol)
 }
 
@@ -31,7 +34,7 @@ impl Tokenizer for String {
 						let num: String = consume_while(&mut it, |a| a.is_numeric())
 							.into_iter()
 							.collect();
-						tokens.push(Token::Integer(num.parse::<i32>().unwrap()));
+						tokens.push(Token::Integer(BigRational::new(num.parse::<BigInt>().unwrap(), 1.to_bigint().unwrap())));
 					},
 					'+' => {
 						it.next().unwrap();

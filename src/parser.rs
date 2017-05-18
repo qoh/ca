@@ -1,11 +1,13 @@
-use super::tokenizer::{Token, Symbol, Tokenizer};
+use super::tokenizer::{Token, Symbol};
 
 use std::fmt;
 use std::iter::{Iterator, Peekable};
 
+use num::BigRational;
+
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-	Integer(i32),
+	Integer(BigRational),
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 
 }
@@ -22,7 +24,18 @@ impl fmt::Display for Expr {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			&Expr::Integer(ref i) => write!(f, "{}", i),
-			_ => write!(f, "{:?}", self)
+			&Expr::BinaryExpr(ref lhs, ref op, ref rhs) => write!(f, "({} {} {})", lhs, op, rhs)
+		}
+	}
+}
+
+impl fmt::Display for Op {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			&Op::Add => write!(f, "+"),
+			&Op::Subtract => write!(f, "-"),
+			&Op::Multiply => write!(f, "*"),
+			&Op::Divide => write!(f, "/"),
 		}
 	}
 }
@@ -65,8 +78,8 @@ fn parse_prefix<'a, It>(it: &mut Peekable<It>) -> Result<Expr, String>
 
 	match it.next() {
 		Some(t) => match t {
-			&Token::Integer(n) => {
-				Ok(Expr::Integer(n))
+			&Token::Integer(ref n) => {
+				Ok(Expr::Integer(n.clone()))
 			},
 			_ => Err(format!("Unexpected token: {:?}", t))
 		},
