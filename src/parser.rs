@@ -81,7 +81,7 @@ fn fmt_ratio_decimal(r: &BigRational, f: &mut fmt::Formatter) -> fmt::Result {
 	}
 
 	if !div.1.is_zero() {
-		write!(f, "...")
+		write!(f, "⋯")
 	} else {
 		Ok(())
 	}
@@ -91,10 +91,10 @@ impl fmt::Display for Op {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			&Op::Add => write!(f, "+"),
-			&Op::Subtract => write!(f, "-"),
-			&Op::Multiply => write!(f, "*"),
-			&Op::Adjacent => write!(f, "*"),
-			&Op::Divide => write!(f, "/"),
+			&Op::Subtract => write!(f, "−"),
+			&Op::Multiply => write!(f, "∙"),
+			&Op::Adjacent => write!(f, "∙"),
+			&Op::Divide => write!(f, "÷"),
 			&Op::Modulus => write!(f, "%"),
 			&Op::Exponent => write!(f, "^"),
 			&Op::Equals => write!(f, "="),
