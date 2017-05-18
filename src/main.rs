@@ -32,11 +32,16 @@ fn main() {
 				let expression = evaluator::evaluate(expression).ok().unwrap();
 
 				print!("  {}", expression);
-				if let parser::Expr::Number(_) = expression {
-					println!("  ({:#})", expression);
-				} else {
-					println!("");
+
+				// Print fraction of numbers
+				if let parser::Expr::Number(ref n) = expression {
+					if !n.is_integer() {
+						println!("  ({:#})", expression);
+						continue; // FIXME: This is not very nice. To prevent the println below.
+					}
 				}
+
+				println!("");
 			},
 			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
 				break
