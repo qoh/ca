@@ -7,12 +7,16 @@ pub fn evaluate(expression: Expr) -> Result<Expr, String> {
 
 		if let Expr::Number(ref lhs_i) = lhs {
 			if let Expr::Number(ref rhs_i) = rhs {
-				return Ok(match op {
-					Op::Add => Expr::Number(lhs_i + rhs_i),
-					Op::Subtract => Expr::Number(lhs_i - rhs_i),
-					Op::Multiply => Expr::Number(lhs_i * rhs_i),
-					Op::Divide => Expr::Number(lhs_i / rhs_i),
-				});
+				match op {
+					Op::Add => return Ok(Expr::Number(lhs_i + rhs_i)),
+					Op::Subtract => return Ok(Expr::Number(lhs_i - rhs_i)),
+					Op::Multiply => return Ok(Expr::Number(lhs_i * rhs_i)),
+					Op::Divide => return Ok(Expr::Number(lhs_i / rhs_i)),
+					Op::Modulus => return Ok(Expr::Number(lhs_i % rhs_i)),
+					Op::Exponent => println!("NYI: a^b"),
+					//Op::Equals => return Ok(Expr::Number(if lhs_i == rhs_i { 1 } else { 0 }))
+					Op::Equals => println!("NYI: a=b")
+				}
 			}
 		}
 

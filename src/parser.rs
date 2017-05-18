@@ -17,7 +17,10 @@ pub enum Op {
 	Add,
 	Subtract,
 	Multiply,
-	Divide
+	Divide,
+	Modulus,
+	Exponent,
+	Equals
 }
 
 impl fmt::Display for Expr {
@@ -36,14 +39,19 @@ impl fmt::Display for Op {
 			&Op::Subtract => write!(f, "-"),
 			&Op::Multiply => write!(f, "*"),
 			&Op::Divide => write!(f, "/"),
+			&Op::Modulus => write!(f, "%"),
+			&Op::Exponent => write!(f, "^"),
+			&Op::Equals => write!(f, "="),
 		}
 	}
 }
 
 fn get_precedence(symbol: &Symbol) -> u8 {
 	match symbol {
+		&Symbol::Equals => 5,
 		&Symbol::Add | &Symbol::Subtract => 10,
-		&Symbol::Multiply | &Symbol::Divide => 20,
+		&Symbol::Multiply | &Symbol::Divide | &Symbol::Modulus => 20,
+		&Symbol::Exponent => 30, // TODO: needs to be right-associative
 	}
 }
 
@@ -98,6 +106,9 @@ fn parse_infix<'a, It>(left: Expr, it: &mut Peekable<It>, precedence: u8) -> Res
 					&Symbol::Subtract => Op::Subtract,
 					&Symbol::Multiply => Op::Multiply,
 					&Symbol::Divide => Op::Divide,
+					&Symbol::Modulus => Op::Modulus,
+					&Symbol::Exponent => Op::Exponent,
+					&Symbol::Equals => Op::Equals,
 				};
 
 				let right = parse_expr(it, precedence).unwrap();

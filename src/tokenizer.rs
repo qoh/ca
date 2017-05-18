@@ -9,7 +9,10 @@ pub enum Symbol {
 	Add,
 	Subtract,
 	Multiply,
-	Divide
+	Divide,
+	Modulus,
+	Exponent,
+	Equals
 }
 
 #[derive(Debug, PartialEq)]
@@ -31,7 +34,7 @@ impl Tokenizer for String {
 			match it.peek() {
 				Some(&ch) => match ch {
 					'0' ... '9' => {
-						let num: String = consume_while(&mut it, |a| a.is_numeric())
+						let num: String = consume_while(&mut it, |a| a.is_numeric() || a == '_' || a == '.')
 							.into_iter()
 							.collect();
 						tokens.push(Token::Integer(BigRational::new(num.parse::<BigInt>().unwrap(), 1.to_bigint().unwrap())));
@@ -51,6 +54,18 @@ impl Tokenizer for String {
 					'/' => {
 						it.next().unwrap();
 						tokens.push(Token::Operator(Symbol::Divide));
+					},
+					'%' => {
+						it.next().unwrap();
+						tokens.push(Token::Operator(Symbol::Modulus));
+					},
+					'^' => {
+						it.next().unwrap();
+						tokens.push(Token::Operator(Symbol::Exponent));
+					},
+					'=' => {
+						it.next().unwrap();
+						tokens.push(Token::Operator(Symbol::Equals));
 					},
 					'\n' => {
 						it.next().unwrap();
