@@ -9,6 +9,7 @@ use num::BigRational;
 pub enum Expr {
 	Number(BigRational),
 	Name(String),
+	Boolean(bool),
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 }
 
@@ -17,6 +18,7 @@ pub enum Op {
 	Add,
 	Subtract,
 	Multiply,
+	Adjacent,
 	Divide,
 	Modulus,
 	Exponent,
@@ -28,6 +30,8 @@ impl fmt::Display for Expr {
 		match self {
 			&Expr::Number(ref i) => write!(f, "{}", i),
 			&Expr::Name(ref n) => write!(f, "{}", n),
+			&Expr::Boolean(ref b) => write!(f, "{}", b),
+			&Expr::BinaryExpr(ref lhs, Op::Adjacent, ref rhs) => write!(f, "({} {})", lhs, rhs),
 			&Expr::BinaryExpr(ref lhs, ref op, ref rhs) => write!(f, "({} {} {})", lhs, op, rhs)
 		}
 	}
@@ -39,6 +43,7 @@ impl fmt::Display for Op {
 			&Op::Add => write!(f, "+"),
 			&Op::Subtract => write!(f, "-"),
 			&Op::Multiply => write!(f, "*"),
+			&Op::Adjacent => write!(f, "*"),
 			&Op::Divide => write!(f, "/"),
 			&Op::Modulus => write!(f, "%"),
 			&Op::Exponent => write!(f, "^"),
@@ -71,6 +76,14 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 			&Token::Operator(ref symbol) => get_precedence(symbol),
 			&Token::LeftParen => break,
 			&Token::RightParen => break,
+			_ => {
+				expr = Expr::BinaryExpr(
+					Box::new(expr),
+					Op::Adjacent,
+					Box::new(parse_expr(it, 0)?) // FIXME: Is 0 the right precedence for this?
+				);
+				continue; // FIXME: Continue? Shouldn't this consume everything possible?
+			},
 			_ => { return Err(String::from("Expected operator after expression")) }
 		};
 

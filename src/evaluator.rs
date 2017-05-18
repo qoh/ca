@@ -11,11 +11,11 @@ pub fn evaluate(expression: Expr) -> Result<Expr, String> {
 					Op::Add => return Ok(Expr::Number(lhs_i + rhs_i)),
 					Op::Subtract => return Ok(Expr::Number(lhs_i - rhs_i)),
 					Op::Multiply => return Ok(Expr::Number(lhs_i * rhs_i)),
+					Op::Adjacent => return Ok(Expr::Number(lhs_i * rhs_i)),
 					Op::Divide => return Ok(Expr::Number(lhs_i / rhs_i)),
 					Op::Modulus => return Ok(Expr::Number(lhs_i % rhs_i)),
 					Op::Exponent => println!("NYI: a^b"),
-					//Op::Equals => return Ok(Expr::Number(if lhs_i == rhs_i { 1 } else { 0 }))
-					Op::Equals => println!("NYI: a=b")
+					Op::Equals => return Ok(Expr::Boolean(lhs_i == rhs_i))
 				}
 			}
 		}
