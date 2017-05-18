@@ -64,11 +64,15 @@ fn fmt_ratio_decimal(r: &BigRational, f: &mut fmt::Formatter) -> fmt::Result {
 
 	let num = r.numer();
 	let den = r.denom();
-
-	if num.sign() == Sign::Minus { write!(f, "-")?; }
+	if num.sign() == Sign::Minus {
+		write!(f, "-")?;
+	}
 
 	let mut div = num.abs().div_rem(den);
-	write!(f, "{}.", div.0)?;
+	write!(f, "{}", div.0)?;
+	if !div.1.is_zero() {
+		write!(f, ".")?;
+	}
 
 	for _ in 0..precision {
 		if div.1.is_zero() { break }
