@@ -31,7 +31,43 @@ impl fmt::Display for Expr {
 		match self {
 			&Expr::Number(ref i) => {
 				if f.alternate() {
-					i.fmt(f)
+					// i.fmt(f)
+					if i.is_integer() {
+						write!(f, "{}", i.denom())
+					} else {
+						for c in i.numer().to_str_radix(10).chars() {
+							write!(f, "{}", match c {
+								'0' => '⁰',
+								'1' => 'ⁱ',
+								'2' => '²',
+								'3' => '³',
+								'4' => '⁴',
+								'5' => '⁵',
+								'6' => '⁶',
+								'7' => '⁷',
+								'8' => '⁸',
+								'9' => '⁹',
+								c => c
+							})?;
+						}
+						write!(f, "⁄")?;
+						for c in i.denom().to_str_radix(10).chars() {
+							write!(f, "{}", match c {
+								'0' => '₀',
+								'1' => '₁',
+								'2' => '₂',
+								'3' => '₃',
+								'4' => '₄',
+								'5' => '₅',
+								'6' => '₆',
+								'7' => '₇',
+								'8' => '₈',
+								'9' => '₉',
+								c => c
+							})?;
+						}
+						Ok(())
+					}
 				} else {
 					fmt_ratio_decimal(i, f)
 				}
