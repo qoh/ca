@@ -32,11 +32,11 @@ pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
 	loop {
 		match it.peek() {
 			Some(&ch) => match ch {
-				'0' ... '9' => {
+				'0' ... '9' | '.' => {
 					let num: Vec<char> = consume_while(&mut it, |a| a.is_numeric() || a == '_' || a == '.')
 						.into_iter()
 						.collect();
-					tokens.push(Token::Integer(parse_number(num)));
+					tokens.push(Token::Integer(parse_number(num)?));
 				},
 				'+' => {
 					it.next().unwrap();
@@ -78,7 +78,7 @@ pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
 						.collect();
 					tokens.push(Token::Name(name));
 				}
-				_ => return Err(format!("invalid char {}", ch))
+				_ => return Err(format!("Invalid char '{}'", ch))
 			},
 			None => break
 		}
@@ -87,7 +87,7 @@ pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
 	Ok(tokens)
 }
 
-fn parse_number(chars: Vec<char>) -> BigRational {
+fn parse_number(chars: Vec<char>) -> Result<BigRational, String> {
 	// BigRational::new(chars.parse::<BigInt>().unwrap(). 1.to_bigint().unwrap())
 
 	let mut separator: Option<usize> = None;
@@ -110,7 +110,11 @@ fn parse_number(chars: Vec<char>) -> BigRational {
 
 	let digits: String = digits.into_iter().collect();
 
-	BigRational::new(digits.parse::<BigInt>().unwrap(), denom)
+	if let Ok(numer) = digits.parse::<BigInt>() {
+		Ok(BigRational::new(numer, denom))
+	} else {
+		Err(String::from("Failed to parse number"))
+	}
 }
 
 fn consume_while<F>(it: &mut Peekable<Chars>, x: F) -> Vec<char>
