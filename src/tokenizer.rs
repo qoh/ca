@@ -21,6 +21,7 @@ pub enum Token {
 	Name(String),
 	LeftParen,
 	RightParen,
+	Comma,
 	Operator(Symbol)
 }
 
@@ -70,6 +71,7 @@ impl Tokenizer for String {
 						it.next().unwrap();
 						tokens.push(Token::Operator(Symbol::Equals));
 					},
+					',' => { it.next().unwrap(); tokens.push(Token::Comma) },
 					'(' => { it.next().unwrap(); tokens.push(Token::LeftParen) },
 					')' => { it.next().unwrap(); tokens.push(Token::RightParen) },
 					'\n' | '\t' | ' ' => {
