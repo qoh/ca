@@ -64,7 +64,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<Expr, String> {
 fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, String>
 	where It: Iterator<Item=&'a Token> {
 
-	let mut expr = parse_prefix(it).unwrap();
+	let mut expr = parse_prefix(it)?;
 
 	while let Some(&next_token) = it.peek() {
 		let next_precedence = match next_token {
@@ -78,7 +78,7 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 			break;
 		}
 
-		expr = parse_infix(expr, it, next_precedence).unwrap();
+		expr = parse_infix(expr, it, next_precedence)?;
 	}
 
 	Ok(expr)
@@ -125,7 +125,7 @@ fn parse_infix<'a, It>(left: Expr, it: &mut Peekable<It>, precedence: u8) -> Res
 					&Symbol::Equals => Op::Equals,
 				};
 
-				let right = parse_expr(it, precedence).unwrap();
+				let right = parse_expr(it, precedence)?;
 
 				Ok(Expr::BinaryExpr(
 					Box::new(left),

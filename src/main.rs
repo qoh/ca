@@ -21,7 +21,10 @@ fn main() {
 			Ok(line) => {
 				rl.add_history_entry(&line);
 				let tokens = line.tokenize();
-				let expression = parser::parse(tokens).ok().unwrap();
+				let expression = match parser::parse(tokens) {
+					Ok(e) => e,
+					Err(e) => { println!("Error: {}", e); continue }
+				};
 				let expression = evaluator::evaluate(expression).ok().unwrap();
 				println!("  {}", expression);
 			},
