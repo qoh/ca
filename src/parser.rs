@@ -3,7 +3,8 @@ use super::tokenizer::{Token, Symbol};
 use std::fmt;
 use std::iter::{Iterator, Peekable};
 
-use num::BigRational;
+use num::{Zero, Signed, Integer, BigRational};
+use num::bigint::{Sign, ToBigInt};
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -28,12 +29,57 @@ pub enum Op {
 impl fmt::Display for Expr {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			&Expr::Number(ref i) => write!(f, "{}", i),
+			&Expr::Number(ref i) => {
+				if f.alternate() {
+					i.fmt(f)
+				} else {
+					fmt_ratio_decimal(i, f)
+				}
+			},
 			&Expr::Name(ref n) => write!(f, "{}", n),
 			&Expr::Boolean(ref b) => write!(f, "{}", b),
-			&Expr::BinaryExpr(ref lhs, Op::Adjacent, ref rhs) => write!(f, "({} {})", lhs, rhs),
-			&Expr::BinaryExpr(ref lhs, ref op, ref rhs) => write!(f, "({} {} {})", lhs, op, rhs)
+			&Expr::BinaryExpr(ref lhs, Op::Adjacent, ref rhs) => {
+				write!(f, "(")?;
+				lhs.fmt(f)?;
+				write!(f, " ")?;
+				rhs.fmt(f)?;
+				write!(f, ")")
+			},
+			&Expr::BinaryExpr(ref lhs, ref op, ref rhs) => {
+				write!(f, "(")?;
+				lhs.fmt(f)?;
+				write!(f, " ")?;
+				op.fmt(f)?;
+				write!(f, " ")?;
+				rhs.fmt(f)?;
+				write!(f, ")")
+			}
 		}
+	}
+}
+
+fn fmt_ratio_decimal(r: &BigRational, f: &mut fmt::Formatter) -> fmt::Result {
+	let precision = f.precision().unwrap_or(5);
+	let base = 10.to_bigint().unwrap();
+
+	let num = r.numer();
+	let den = r.denom();
+
+	if num.sign() == Sign::Minus { write!(f, "-")?; }
+
+	let mut div = num.abs().div_rem(den);
+	write!(f, "{}.", div.0)?;
+
+	for _ in 0..precision {
+		if div.1.is_zero() { break }
+		div = (&base * div.1).div_rem(den);
+		write!(f, "{}", div.0)?;
+	}
+
+	if !div.1.is_zero() {
+		write!(f, "...")
+	} else {
+		Ok(())
 	}
 }
 
