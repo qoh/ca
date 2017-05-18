@@ -19,6 +19,8 @@ pub enum Symbol {
 pub enum Token {
 	Integer(BigRational),
 	Name(String),
+	LeftParen,
+	RightParen,
 	Operator(Symbol)
 }
 
@@ -68,6 +70,8 @@ impl Tokenizer for String {
 						it.next().unwrap();
 						tokens.push(Token::Operator(Symbol::Equals));
 					},
+					'(' => { it.next().unwrap(); tokens.push(Token::LeftParen) },
+					')' => { it.next().unwrap(); tokens.push(Token::RightParen) },
 					'\n' | '\t' | ' ' => {
 						it.next().unwrap();
 					},

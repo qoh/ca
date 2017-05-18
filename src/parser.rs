@@ -69,6 +69,8 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 	while let Some(&next_token) = it.peek() {
 		let next_precedence = match next_token {
 			&Token::Operator(ref symbol) => get_precedence(symbol),
+			&Token::LeftParen => break,
+			&Token::RightParen => break,
 			_ => { return Err(String::from("Expected operator after expression")) }
 		};
 
@@ -93,6 +95,13 @@ fn parse_prefix<'a, It>(it: &mut Peekable<It>) -> Result<Expr, String>
 			},
 			&Token::Name(ref n) => {
 				Ok(Expr::Name(n.clone()))
+			},
+			&Token::LeftParen => {
+				let result = parse_expr(it, 0);
+				match it.next() {
+					Some(&Token::RightParen) => result,
+					_ => Err(String::from("Missing right parenthesis"))
+				}
 			},
 			_ => Err(format!("Unexpected token: {:?}", t))
 		},
