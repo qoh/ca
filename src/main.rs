@@ -28,7 +28,7 @@ fn main() {
 				};
 				// println!(" >{:#}", expression);
 				let expression = evaluator::evaluate(expression).ok().unwrap();
-				println!("  {}", expression);
+				println!("  {}    ({:#})", expression, expression);
 			},
 			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
 				break
