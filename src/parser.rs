@@ -1,5 +1,6 @@
 use super::tokenizer::{Token, Symbol, Tokenizer};
 
+use std::fmt;
 use std::iter::{Iterator, Peekable};
 
 #[derive(Debug, PartialEq)]
@@ -15,6 +16,15 @@ pub enum Op {
 	Subtract,
 	Multiply,
 	Divide
+}
+
+impl fmt::Display for Expr {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			&Expr::Integer(ref i) => write!(f, "{}", i),
+			_ => write!(f, "{:?}", self)
+		}
+	}
 }
 
 fn get_precedence(symbol: &Symbol) -> u8 {

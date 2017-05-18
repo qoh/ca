@@ -19,9 +19,9 @@ fn main() {
 		if line.len() == 0 { break }
 		let tokens = line.tokenize();
 		let expression = parser::parse(tokens).ok().unwrap();
-		println!("{:?}", expression);
+		println!("{}", expression);
 		let expression = evaluator::evaluate(expression).ok().unwrap();
-		println!("< {:?}", expression);
+		println!("< {}", expression);
 		line.truncate(0)
 	}
 }
