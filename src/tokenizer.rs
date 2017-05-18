@@ -67,7 +67,7 @@ impl Tokenizer for String {
 						it.next().unwrap();
 						tokens.push(Token::Operator(Symbol::Equals));
 					},
-					'\n' => {
+					'\n' | '\t' | ' ' => {
 						it.next().unwrap();
 					},
 					_ => panic!("invalid char {}", ch)
