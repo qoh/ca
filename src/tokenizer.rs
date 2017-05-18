@@ -25,72 +25,66 @@ pub enum Token {
 	Operator(Symbol)
 }
 
-pub trait Tokenizer {
-	fn tokenize(&self) -> Vec<Token>;
-}
+pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
+	let mut it = src.chars().peekable();
+	let mut tokens: Vec<Token> = vec![];
 
-impl Tokenizer for String {
-	fn tokenize(&self) -> Vec<Token> {
-		let mut it = self.chars().peekable();
-		let mut tokens: Vec<Token> = vec![];
-
-		loop {
-			match it.peek() {
-				Some(&ch) => match ch {
-					'0' ... '9' => {
-						let num: Vec<char> = consume_while(&mut it, |a| a.is_numeric() || a == '_' || a == '.')
-							.into_iter()
-							.collect();
-						tokens.push(Token::Integer(parse_number(num)));
-					},
-					'+' => {
-						it.next().unwrap();
-						tokens.push(Token::Operator(Symbol::Add));
-					},
-					'-' => {
-						it.next().unwrap();
-						tokens.push(Token::Operator(Symbol::Subtract));
-					},
-					'*' => {
-						it.next().unwrap();
-						tokens.push(Token::Operator(Symbol::Multiply));
-					},
-					'/' => {
-						it.next().unwrap();
-						tokens.push(Token::Operator(Symbol::Divide));
-					},
-					'%' => {
-						it.next().unwrap();
-						tokens.push(Token::Operator(Symbol::Modulus));
-					},
-					'^' => {
-						it.next().unwrap();
-						tokens.push(Token::Operator(Symbol::Exponent));
-					},
-					'=' => {
-						it.next().unwrap();
-						tokens.push(Token::Operator(Symbol::Equals));
-					},
-					',' => { it.next().unwrap(); tokens.push(Token::Comma) },
-					'(' => { it.next().unwrap(); tokens.push(Token::LeftParen) },
-					')' => { it.next().unwrap(); tokens.push(Token::RightParen) },
-					'\n' | '\t' | ' ' => {
-						it.next().unwrap();
-					},
-					a if a.is_alphabetic() => {
-						let name: String = consume_while(&mut it, |a| a.is_alphabetic())
-							.into_iter()
-							.collect();
-						tokens.push(Token::Name(name));
-					}
-					_ => panic!("invalid char {}", ch)
+	loop {
+		match it.peek() {
+			Some(&ch) => match ch {
+				'0' ... '9' => {
+					let num: Vec<char> = consume_while(&mut it, |a| a.is_numeric() || a == '_' || a == '.')
+						.into_iter()
+						.collect();
+					tokens.push(Token::Integer(parse_number(num)));
 				},
-				None => break
-			}
+				'+' => {
+					it.next().unwrap();
+					tokens.push(Token::Operator(Symbol::Add));
+				},
+				'-' => {
+					it.next().unwrap();
+					tokens.push(Token::Operator(Symbol::Subtract));
+				},
+				'*' => {
+					it.next().unwrap();
+					tokens.push(Token::Operator(Symbol::Multiply));
+				},
+				'/' => {
+					it.next().unwrap();
+					tokens.push(Token::Operator(Symbol::Divide));
+				},
+				'%' => {
+					it.next().unwrap();
+					tokens.push(Token::Operator(Symbol::Modulus));
+				},
+				'^' => {
+					it.next().unwrap();
+					tokens.push(Token::Operator(Symbol::Exponent));
+				},
+				'=' => {
+					it.next().unwrap();
+					tokens.push(Token::Operator(Symbol::Equals));
+				},
+				',' => { it.next().unwrap(); tokens.push(Token::Comma) },
+				'(' => { it.next().unwrap(); tokens.push(Token::LeftParen) },
+				')' => { it.next().unwrap(); tokens.push(Token::RightParen) },
+				'\n' | '\t' | ' ' => {
+					it.next().unwrap();
+				},
+				a if a.is_alphabetic() => {
+					let name: String = consume_while(&mut it, |a| a.is_alphabetic())
+						.into_iter()
+						.collect();
+					tokens.push(Token::Name(name));
+				}
+				_ => return Err(format!("invalid char {}", ch))
+			},
+			None => break
 		}
-
-		tokens
 	}
+
+	Ok(tokens)
 }
 
 fn parse_number(chars: Vec<char>) -> BigRational {

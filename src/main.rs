@@ -10,8 +10,6 @@ mod parser;
 mod tokenizer;
 mod evaluator;
 
-use tokenizer::Tokenizer;
-
 fn main() {
 	let mut rl = Editor::<()>::new();
 
@@ -20,7 +18,10 @@ fn main() {
 		match readline {
 			Ok(line) => {
 				rl.add_history_entry(&line);
-				let tokens = line.tokenize();
+				let tokens = match tokenizer::tokenize(&line) {
+					Ok(e) => e,
+					Err(e) => { println!("Error: {}", e); continue }
+				};
 				let expression = match parser::parse(tokens) {
 					Ok(e) => e,
 					Err(e) => { println!("Error: {}", e); continue }
