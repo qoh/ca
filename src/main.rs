@@ -26,7 +26,7 @@ fn main() {
 					Ok(e) => e,
 					Err(e) => { println!("Error: {}", e); continue }
 				};
-				println!(" >{:#}", expression);
+				// println!(" >{:#}", expression);
 				let expression = evaluator::evaluate(expression).ok().unwrap();
 				println!("  {}", expression);
 			},
