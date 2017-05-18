@@ -5,3 +5,4 @@ authors = ["ns <portification@gmail.com>"]
 
 [dependencies]
 num = "0.1.37"
+rustyline = "1.0.0"

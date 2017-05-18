@@ -1,8 +1,10 @@
 // #![feature(box_patterns)]
 
 extern crate num;
+extern crate rustyline;
 
-use std::io::{self, BufRead, Write};
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 mod parser;
 mod tokenizer;
@@ -11,18 +13,25 @@ mod evaluator;
 use tokenizer::Tokenizer;
 
 fn main() {
-	let mut line = String::new();
-	let stdin = io::stdin();
+	let mut rl = Editor::<()>::new();
 
 	loop {
-		print!("% ");
-		io::stdout().flush().ok().expect("Could not flush stdout");
-		stdin.lock().read_line(&mut line).expect("Could not read line");
-		if line.len() == 0 { break }
-		let tokens = line.tokenize();
-		let expression = parser::parse(tokens).ok().unwrap();
-		let expression = evaluator::evaluate(expression).ok().unwrap();
-		println!("  {}", expression);
-		line.truncate(0)
+		let readline = rl.readline("% ");
+		match readline {
+			Ok(line) => {
+				rl.add_history_entry(&line);
+				let tokens = line.tokenize();
+				let expression = parser::parse(tokens).ok().unwrap();
+				let expression = evaluator::evaluate(expression).ok().unwrap();
+				println!("  {}", expression);
+			},
+			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+				break
+			},
+			Err(err) => {
+				println!("Error: {:?}", err);
+				break
+			}
+		}
 	}
 }
