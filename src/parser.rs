@@ -3,7 +3,7 @@ use super::tokenizer::{Token, Symbol};
 use std::fmt;
 use std::iter::{Iterator, Peekable};
 
-use num::BigRational;
+use num::{Zero, BigRational};
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -52,12 +52,14 @@ impl fmt::Display for Op {
 	}
 }
 
-fn get_precedence(symbol: &Symbol) -> u8 {
+const UNARY_PRIORITY: u8 = 8;
+
+fn get_precedence(symbol: &Symbol) -> (u8, u8) {
 	match symbol {
-		&Symbol::Equals => 5,
-		&Symbol::Add | &Symbol::Subtract => 10,
-		&Symbol::Multiply | &Symbol::Divide | &Symbol::Modulus => 20,
-		&Symbol::Exponent => 30, // TODO: needs to be right-associative
+		&Symbol::Equals => (3, 3),
+		&Symbol::Add | &Symbol::Subtract => (6, 6),
+		&Symbol::Multiply | &Symbol::Divide | &Symbol::Modulus => (7, 7),
+		&Symbol::Exponent => (10, 9),
 	}
 }
 
@@ -72,7 +74,7 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 	let mut expr = parse_prefix(it)?;
 
 	while let Some(&next_token) = it.peek() {
-		let next_precedence = match next_token {
+		let (left_prec, right_prec) = match next_token {
 			&Token::Operator(ref symbol) => get_precedence(symbol),
 			&Token::LeftParen => break,
 			&Token::RightParen => break,
@@ -83,15 +85,14 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 					Box::new(parse_expr(it, 0)?) // FIXME: Is 0 the right precedence for this?
 				);
 				continue; // FIXME: Continue? Shouldn't this consume everything possible?
-			},
-			_ => { return Err(String::from("Expected operator after expression")) }
+			}
 		};
 
-		if precedence >= next_precedence {
+		if precedence >= left_prec {
 			break;
 		}
 
-		expr = parse_infix(expr, it, next_precedence)?;
+		expr = parse_infix(expr, it, right_prec)?;
 	}
 
 	Ok(expr)
@@ -108,6 +109,12 @@ fn parse_prefix<'a, It>(it: &mut Peekable<It>) -> Result<Expr, String>
 			},
 			&Token::Name(ref n) => {
 				Ok(Expr::Name(n.clone()))
+			},
+			&Token::Operator(Symbol::Subtract) => {
+				Ok(Expr::BinaryExpr(
+					Box::new(Expr::Number(BigRational::zero())),
+					Op::Subtract,
+					Box::new(parse_expr(it, UNARY_PRIORITY)?)))
 			},
 			&Token::LeftParen => {
 				let result = parse_expr(it, 0);
