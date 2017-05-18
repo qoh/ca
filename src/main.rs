@@ -18,6 +18,7 @@ fn main() {
 		match readline {
 			Ok(line) => {
 				rl.add_history_entry(&line);
+
 				let tokens = match tokenizer::tokenize(&line) {
 					Ok(e) => e,
 					Err(e) => { println!("Error: {}", e); continue }
@@ -26,9 +27,16 @@ fn main() {
 					Ok(e) => e,
 					Err(e) => { println!("Error: {}", e); continue }
 				};
+
 				// println!(" >{:#}", expression);
 				let expression = evaluator::evaluate(expression).ok().unwrap();
-				println!("  {}    ({:#})", expression, expression);
+
+				print!("  {}", expression);
+				if let parser::Expr::Number(_) = expression {
+					println!("  ({:#})", expression);
+				} else {
+					println!("");
+				}
 			},
 			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
 				break
