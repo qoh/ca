@@ -42,15 +42,15 @@ pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
 					it.next().unwrap();
 					tokens.push(Token::Operator(Symbol::Add));
 				},
-				'-' => {
+				'-' | '−' => {
 					it.next().unwrap();
 					tokens.push(Token::Operator(Symbol::Subtract));
 				},
-				'*' => {
+				'*' | '∙' => {
 					it.next().unwrap();
 					tokens.push(Token::Operator(Symbol::Multiply));
 				},
-				'/' => {
+				'/' | '÷' | '∕' => {
 					it.next().unwrap();
 					tokens.push(Token::Operator(Symbol::Divide));
 				},
