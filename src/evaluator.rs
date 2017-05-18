@@ -5,13 +5,13 @@ pub fn evaluate(expression: Expr) -> Result<Expr, String> {
 		let lhs = evaluate(*lhs)?;
 		let rhs = evaluate(*rhs)?;
 
-		if let Expr::Integer(ref lhs_i) = lhs {
-			if let Expr::Integer(ref rhs_i) = rhs {
+		if let Expr::Number(ref lhs_i) = lhs {
+			if let Expr::Number(ref rhs_i) = rhs {
 				return Ok(match op {
-					Op::Add => Expr::Integer(lhs_i + rhs_i),
-					Op::Subtract => Expr::Integer(lhs_i - rhs_i),
-					Op::Multiply => Expr::Integer(lhs_i * rhs_i),
-					Op::Divide => Expr::Integer(lhs_i / rhs_i),
+					Op::Add => Expr::Number(lhs_i + rhs_i),
+					Op::Subtract => Expr::Number(lhs_i - rhs_i),
+					Op::Multiply => Expr::Number(lhs_i * rhs_i),
+					Op::Divide => Expr::Number(lhs_i / rhs_i),
 				});
 			}
 		}

@@ -7,7 +7,7 @@ use num::BigRational;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-	Integer(BigRational),
+	Number(BigRational),
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 
 }
@@ -23,7 +23,7 @@ pub enum Op {
 impl fmt::Display for Expr {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			&Expr::Integer(ref i) => write!(f, "{}", i),
+			&Expr::Number(ref i) => write!(f, "{}", i),
 			&Expr::BinaryExpr(ref lhs, ref op, ref rhs) => write!(f, "({} {} {})", lhs, op, rhs)
 		}
 	}
@@ -79,7 +79,7 @@ fn parse_prefix<'a, It>(it: &mut Peekable<It>) -> Result<Expr, String>
 	match it.next() {
 		Some(t) => match t {
 			&Token::Integer(ref n) => {
-				Ok(Expr::Integer(n.clone()))
+				Ok(Expr::Number(n.clone()))
 			},
 			_ => Err(format!("Unexpected token: {:?}", t))
 		},
