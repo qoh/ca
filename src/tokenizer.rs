@@ -18,6 +18,7 @@ pub enum Symbol {
 #[derive(Debug, PartialEq)]
 pub enum Token {
 	Integer(BigRational),
+	Name(String),
 	Operator(Symbol)
 }
 
@@ -70,6 +71,12 @@ impl Tokenizer for String {
 					'\n' | '\t' | ' ' => {
 						it.next().unwrap();
 					},
+					a if a.is_alphabetic() => {
+						let name: String = consume_while(&mut it, |a| a.is_alphabetic())
+							.into_iter()
+							.collect();
+						tokens.push(Token::Name(name));
+					}
 					_ => panic!("invalid char {}", ch)
 				},
 				None => break
