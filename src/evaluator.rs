@@ -3,10 +3,12 @@ use num::{ToPrimitive, BigRational};
 use num::rational::Ratio;
 use num::bigint::ToBigInt;
 
-pub fn evaluate(expression: Expr) -> Result<Expr, String> {
+use super::context::Context;
+
+pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String> {
 	if let Expr::BinaryExpr(lhs, op, rhs) = expression {
-		let lhs = evaluate(*lhs)?;
-		let rhs = evaluate(*rhs)?;
+		let lhs = evaluate(*lhs, context)?;
+		let rhs = evaluate(*rhs, context)?;
 
 		if let Expr::Number(ref lhs_i) = lhs {
 			if let Expr::Number(ref rhs_i) = rhs {
@@ -28,6 +30,13 @@ pub fn evaluate(expression: Expr) -> Result<Expr, String> {
 		}
 
 		return Ok(Expr::BinaryExpr(Box::new(lhs), op, Box::new(rhs)));
+	}
+
+	if let Expr::Name(ref name) = expression {
+		if let Some(expr) = context.get(name) {
+			// FIXME: This use of Clone
+			return evaluate(expr, &mut context.evaluate((*name).clone()));
+		}
 	}
 
 	Ok(expression)

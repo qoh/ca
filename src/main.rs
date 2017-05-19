@@ -9,9 +9,12 @@ use rustyline::Editor;
 mod parser;
 mod tokenizer;
 mod evaluator;
+mod context;
 
 fn main() {
 	let mut rl = Editor::<()>::new();
+
+	let mut scope = context::Scope::new();
 
 	loop {
 		let readline = rl.readline("% ");
@@ -29,7 +32,19 @@ fn main() {
 				};
 
 				// println!(" >{:#}", expression);
-				let expression = evaluator::evaluate(expression).ok().unwrap();
+
+				let mut context = context::Context::new(&mut scope);
+
+				if let parser::Expr::Assign(lhs, rhs) = expression {
+					if let parser::Expr::Name(ref name) = *lhs {
+						context.insert((*name).clone(), *rhs);
+					} else {
+						println!("Error: Cannot assign to {}", lhs);
+					}
+					continue;
+				}
+
+				let expression = evaluator::evaluate(expression, &mut context).ok().unwrap();
 
 				print!("  {}", expression);
 
