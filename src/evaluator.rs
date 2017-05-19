@@ -39,6 +39,16 @@ pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String>
 		}
 	}
 
+	if let Expr::Tuple(ref items) = expression {
+		let mut evaluated = Vec::with_capacity(items.len());
+
+		for item in items.iter() {
+			evaluated.push(evaluate((*item).clone(), context)?);
+		}
+
+		return Ok(Expr::Tuple(evaluated));
+	}
+
 	Ok(expression)
 }
 
