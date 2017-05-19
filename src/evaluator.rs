@@ -1,5 +1,5 @@
 use super::parser::{Expr, Op};
-use num::{ToPrimitive, BigRational};
+use num::{Signed, ToPrimitive, BigRational};
 use num::rational::Ratio;
 use num::bigint::ToBigInt;
 
@@ -25,6 +25,14 @@ pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String>
 						}
 					},
 					Op::Equals => return Ok(Expr::Boolean(lhs_i == rhs_i))
+				}
+			}
+		}
+
+		if let Expr::Name(ref name) = lhs {
+			if op == Op::Adjacent {
+				if let Some(e) = apply_fn(name, &rhs) {
+					return Ok(e);
 				}
 			}
 		}
@@ -72,5 +80,39 @@ fn ratio_power(lhs: &BigRational, rhs: &BigRational) -> Option<BigRational> {
 		}
 	}
 	
+	None
+}
+
+fn apply_fn(name: &String, operand: &Expr) -> Option<Expr> {
+	if name == "floor" {
+		if let &Expr::Number(ref n) = operand {
+			return Some(Expr::Number(n.floor()));
+		}
+	}
+	if name == "ceil" {
+		if let &Expr::Number(ref n) = operand {
+			return Some(Expr::Number(n.ceil()));
+		}
+	}
+	if name == "round" {
+		if let &Expr::Number(ref n) = operand {
+			return Some(Expr::Number(n.round()));
+		}
+	}
+	if name == "trunc" {
+		if let &Expr::Number(ref n) = operand {
+			return Some(Expr::Number(n.trunc()));
+		}
+	}
+	if name == "fract" {
+		if let &Expr::Number(ref n) = operand {
+			return Some(Expr::Number(n.fract()));
+		}
+	}
+	if name == "abs" {
+		if let &Expr::Number(ref n) = operand {
+			return Some(Expr::Number(n.abs()));
+		}
+	}
 	None
 }
