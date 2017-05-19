@@ -5,25 +5,20 @@ use num::{pow, BigInt, BigRational};
 use num::bigint::ToBigInt;
 
 #[derive(Debug, PartialEq)]
-pub enum Symbol {
+pub enum Token {
+	Number(BigRational),
+	Name(String),
+	LeftParen,
+	RightParen,
 	Add,
 	Subtract,
 	Multiply,
 	Divide,
 	Modulus,
 	Exponent,
-	Equals
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Token {
-	Integer(BigRational),
-	Name(String),
-	LeftParen,
-	RightParen,
+	Equals,
 	Comma,
 	Assign,
-	Operator(Symbol)
 }
 
 pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
@@ -37,35 +32,35 @@ pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
 					let num: Vec<char> = consume_while(&mut it, |a| a.is_numeric() || a == '_' || a == '.')
 						.into_iter()
 						.collect();
-					tokens.push(Token::Integer(parse_number(num)?));
+					tokens.push(Token::Number(parse_number(num)?));
 				},
 				'+' => {
 					it.next().unwrap();
-					tokens.push(Token::Operator(Symbol::Add));
+					tokens.push(Token::Add);
 				},
 				'-' | '−' => {
 					it.next().unwrap();
-					tokens.push(Token::Operator(Symbol::Subtract));
+					tokens.push(Token::Subtract);
 				},
 				'*' | '∙' => {
 					it.next().unwrap();
-					tokens.push(Token::Operator(Symbol::Multiply));
+					tokens.push(Token::Multiply);
 				},
 				'/' | '÷' | '∕' => {
 					it.next().unwrap();
-					tokens.push(Token::Operator(Symbol::Divide));
+					tokens.push(Token::Divide);
 				},
 				'%' => {
 					it.next().unwrap();
-					tokens.push(Token::Operator(Symbol::Modulus));
+					tokens.push(Token::Modulus);
 				},
 				'^' => {
 					it.next().unwrap();
-					tokens.push(Token::Operator(Symbol::Exponent));
+					tokens.push(Token::Exponent);
 				},
 				'=' => {
 					it.next().unwrap();
-					tokens.push(Token::Operator(Symbol::Equals));
+					tokens.push(Token::Equals);
 				},
 				':' => {
 					it.next().unwrap();

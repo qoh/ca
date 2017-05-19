@@ -1,4 +1,4 @@
-use super::tokenizer::{Token, Symbol};
+use super::tokenizer::{Token};
 
 use std::fmt;
 use std::iter::{Iterator, Peekable};
@@ -133,12 +133,13 @@ impl fmt::Display for Op {
 
 const UNARY_PRIORITY: u8 = 8;
 
-fn get_precedence(symbol: &Symbol) -> (u8, u8) {
-	match symbol {
-		&Symbol::Equals => (3, 3),
-		&Symbol::Add | &Symbol::Subtract => (6, 6),
-		&Symbol::Multiply | &Symbol::Divide | &Symbol::Modulus => (7, 7),
-		&Symbol::Exponent => (10, 9),
+fn get_precedence(token: &Token) -> Option<(u8, u8)> {
+	match token {
+		&Token::Equals => Some((3, 3)),
+		&Token::Add | &Token::Subtract => Some((6, 6)),
+		&Token::Multiply | &Token::Divide | &Token::Modulus => Some((7, 7)),
+		&Token::Exponent => Some((10, 9)),
+		_ => None
 	}
 }
 
@@ -170,10 +171,9 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 	let mut expr = parse_prefix(it)?;
 
 	while let Some(&next_token) = it.peek() {
-		let (left_prec, right_prec) = match next_token {
-			&Token::Operator(ref symbol) => get_precedence(symbol),
+		match next_token {
 			&Token::RightParen => break,
-			&Token::Name(_) | &Token::Integer(_) | &Token::LeftParen => {
+			&Token::Name(_) | &Token::Number(_) | &Token::LeftParen => {
 				expr = Expr::BinaryExpr(
 					Box::new(expr),
 					Op::Adjacent,
@@ -181,7 +181,12 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 				);
 				continue; // FIXME: Continue? Shouldn't this consume everything possible?
 			},
-			_ => break
+			_ => {}
+		}
+
+		let (left_prec, right_prec) = match get_precedence(next_token) {
+			Some((l, r)) => (l, r),
+			None => break
 		};
 
 		if precedence >= left_prec {
@@ -199,13 +204,13 @@ fn parse_prefix<'a, It>(it: &mut Peekable<It>) -> Result<Expr, String>
 
 	match it.next() {
 		Some(t) => match t {
-			&Token::Integer(ref n) => {
+			&Token::Number(ref n) => {
 				Ok(Expr::Number(n.clone()))
 			},
 			&Token::Name(ref n) => {
 				Ok(Expr::Name(n.clone()))
 			},
-			&Token::Operator(Symbol::Subtract) => {
+			&Token::Subtract => {
 				Ok(Expr::BinaryExpr(
 					Box::new(Expr::Number(BigRational::zero())),
 					Op::Subtract,
@@ -245,26 +250,24 @@ fn parse_infix<'a, It>(left: Expr, it: &mut Peekable<It>, precedence: u8) -> Res
 	where It: Iterator<Item=&'a Token> {
 
 	match it.next() {
-		Some(t) => match t {
-			&Token::Operator(ref s) => {
-				let op = match s {
-					&Symbol::Add => Op::Add,
-					&Symbol::Subtract => Op::Subtract,
-					&Symbol::Multiply => Op::Multiply,
-					&Symbol::Divide => Op::Divide,
-					&Symbol::Modulus => Op::Modulus,
-					&Symbol::Exponent => Op::Exponent,
-					&Symbol::Equals => Op::Equals,
-				};
+		Some(t) => {
+			let op = match t {
+				&Token::Add => Op::Add,
+				&Token::Subtract => Op::Subtract,
+				&Token::Multiply => Op::Multiply,
+				&Token::Divide => Op::Divide,
+				&Token::Modulus => Op::Modulus,
+				&Token::Exponent => Op::Exponent,
+				&Token::Equals => Op::Equals,
+				_ => return Err(format!("Unexpected token: {:?}", t))
+			};
 
-				let right = parse_expr(it, precedence)?;
+			let right = parse_expr(it, precedence)?;
 
-				Ok(Expr::BinaryExpr(
-					Box::new(left),
-					op,
-					Box::new(right)))
-			},
-			_ => Err(format!("Unexpected token: {:?}", t))
+			Ok(Expr::BinaryExpr(
+				Box::new(left),
+				op,
+				Box::new(right)))
 		},
 		None => Err(String::from("No more tokens"))
 	}
