@@ -11,6 +11,7 @@ pub enum Expr {
 	Number(BigRational),
 	Name(String),
 	Boolean(bool),
+	Tuple(Vec<Expr>),
 	Assign(Box<Expr>, Box<Expr>),
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 }
@@ -39,6 +40,26 @@ impl fmt::Display for Expr {
 			},
 			&Expr::Name(ref n) => write!(f, "{}", n),
 			&Expr::Boolean(ref b) => write!(f, "{}", b),
+			&Expr::Tuple(ref v) => {
+				write!(f, "(")?;
+
+				let mut it = v.iter().peekable();
+
+				if let Some(e) = it.next() {
+					e.fmt(f)?;
+
+					if it.peek().is_none() {
+						write!(f, ",")?;
+					}
+				}
+
+				for e in it {
+					write!(f, ",")?;
+					e.fmt(f)?;
+				}
+
+				write!(f, ")")
+			},
 			&Expr::BinaryExpr(ref lhs, Op::Adjacent, ref rhs) => {
 				write!(f, "(")?;
 				lhs.fmt(f)?;
@@ -123,6 +144,11 @@ fn get_precedence(symbol: &Symbol) -> (u8, u8) {
 
 pub fn parse(tokens: Vec<Token>) -> Result<Expr, String> {
 	let mut it = tokens.iter().peekable();
+
+	if it.peek().is_none() {
+		return Ok(Expr::Tuple(vec![]));
+	}
+
 	let lhs = parse_expr(&mut it, 0)?;
 	let next = it.next();
 
@@ -186,15 +212,32 @@ fn parse_prefix<'a, It>(it: &mut Peekable<It>) -> Result<Expr, String>
 					Box::new(parse_expr(it, UNARY_PRIORITY)?)))
 			},
 			&Token::LeftParen => {
-				let result = parse_expr(it, 0);
-				match it.next() {
-					Some(&Token::RightParen) => result,
-					_ => Err(String::from("Missing right parenthesis"))
+				let mut exprs: Vec<Expr> = vec![];
+
+				if let Some(&&Token::RightParen) = it.peek() {
+					it.next().unwrap();
+					return Ok(Expr::Tuple(exprs));
+				}
+
+				loop {
+					exprs.push(parse_expr(it, 0)?);
+
+					match it.next() {
+						Some(&Token::RightParen) => break,
+						Some(&Token::Comma) => {},
+						_ => return Err(String::from("Missing right parenthesis"))
+					}
+				}
+
+				if exprs.len() == 1 {
+					Ok(exprs.swap_remove(0))
+				} else {
+					Ok(Expr::Tuple(exprs))
 				}
 			},
 			_ => Err(format!("Unexpected token: {:?}", t))
 		},
-		None => Err(String::from("No more tokens"))
+		None => Err(String::from("Unterminated expression"))
 	}
 }
 
