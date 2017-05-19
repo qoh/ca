@@ -11,6 +11,7 @@ pub enum Expr {
 	Number(BigRational),
 	Name(String),
 	Boolean(bool),
+	Assign(Box<Expr>, Box<Expr>),
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 }
 
@@ -42,6 +43,13 @@ impl fmt::Display for Expr {
 				write!(f, "(")?;
 				lhs.fmt(f)?;
 				write!(f, " ")?;
+				rhs.fmt(f)?;
+				write!(f, ")")
+			},
+			&Expr::Assign(ref lhs, ref rhs) => {
+				write!(f, "(")?;
+				lhs.fmt(f)?;
+				write!(f, " ≔ ")?;
 				rhs.fmt(f)?;
 				write!(f, ")")
 			},
@@ -115,7 +123,19 @@ fn get_precedence(symbol: &Symbol) -> (u8, u8) {
 
 pub fn parse(tokens: Vec<Token>) -> Result<Expr, String> {
 	let mut it = tokens.iter().peekable();
-	parse_expr(&mut it, 0)
+	let lhs = parse_expr(&mut it, 0)?;
+	let next = it.next();
+
+	if let Some(t) = next {
+		if let &Token::Assign = t {
+			let rhs = parse_expr(&mut it, 0)?;
+			Ok(Expr::Assign(Box::new(lhs), Box::new(rhs)))
+		} else {
+			Err(format!("Unexpected token: {:?}", t))
+		}
+	} else {
+		Ok(lhs)
+	}
 }
 
 fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, String>
@@ -126,16 +146,16 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 	while let Some(&next_token) = it.peek() {
 		let (left_prec, right_prec) = match next_token {
 			&Token::Operator(ref symbol) => get_precedence(symbol),
-			&Token::LeftParen => break,
 			&Token::RightParen => break,
-			_ => {
+			&Token::Name(_) | &Token::Integer(_) | &Token::LeftParen => {
 				expr = Expr::BinaryExpr(
 					Box::new(expr),
 					Op::Adjacent,
 					Box::new(parse_expr(it, 0)?) // FIXME: Is 0 the right precedence for this?
 				);
 				continue; // FIXME: Continue? Shouldn't this consume everything possible?
-			}
+			},
+			_ => break
 		};
 
 		if precedence >= left_prec {
@@ -151,7 +171,6 @@ fn parse_expr<'a, It>(it: &mut Peekable<It>, precedence: u8) -> Result<Expr, Str
 fn parse_prefix<'a, It>(it: &mut Peekable<It>) -> Result<Expr, String>
 	where It: Iterator<Item=&'a Token> {
 
-	// TODO: Don't use Clone here
 	match it.next() {
 		Some(t) => match t {
 			&Token::Integer(ref n) => {

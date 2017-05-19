@@ -22,6 +22,7 @@ pub enum Token {
 	LeftParen,
 	RightParen,
 	Comma,
+	Assign,
 	Operator(Symbol)
 }
 
@@ -65,6 +66,19 @@ pub fn tokenize(src: &String) -> Result<Vec<Token>, String> {
 				'=' => {
 					it.next().unwrap();
 					tokens.push(Token::Operator(Symbol::Equals));
+				},
+				':' => {
+					it.next().unwrap();
+					if let Some(&'=') = it.peek() {
+						it.next().unwrap();
+						tokens.push(Token::Assign);
+					} else {
+						return Err(String::from("Expected = after :"));
+					}
+				},
+				'≔' => {
+					it.next().unwrap();
+					tokens.push(Token::Assign);
 				},
 				',' => { it.next().unwrap(); tokens.push(Token::Comma) },
 				'(' => { it.next().unwrap(); tokens.push(Token::LeftParen) },
