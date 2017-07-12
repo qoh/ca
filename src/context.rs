@@ -10,7 +10,6 @@ impl Scope {
 	pub fn new() -> Self {
 		Scope { vars: HashMap::new() }
 	}
-
 }
 
 pub struct Context<'a> {

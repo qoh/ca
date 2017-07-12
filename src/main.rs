@@ -31,8 +31,6 @@ fn main() {
 					Err(e) => { println!("Error: {}", e); continue }
 				};
 
-				// println!(" >{:#}", expression);
-
 				let mut context = context::Context::new(&mut scope);
 
 				if let parser::Expr::Assign(lhs, rhs) = expression {
@@ -51,8 +49,7 @@ fn main() {
 				// Print fraction of numbers
 				if let parser::Expr::Number(ref n) = expression {
 					if !n.is_integer() {
-						println!("  ({:#})", expression);
-						continue; // FIXME: This is not very nice. To prevent the println below.
+						print!("  ({:#})", expression);
 					}
 				}
 
