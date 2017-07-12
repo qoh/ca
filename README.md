@@ -19,7 +19,7 @@
 To try `ca`, just clone the repository and run `cargo run` with Rust stable:
 
 ```
-$ git clone https://github.com/portify/ca
+$ git clone https://github.com/qoh/ca
 $ cd ca
 $ cargo run
 ```
