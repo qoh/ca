@@ -1,11 +1,13 @@
 [package]
 name = "ca"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["ns <portification@gmail.com>"]
 description = "Arbitrary precision calculator REPL"
 license = "MIT"
 homepage = "https://github.com/qoh/ca"
 repository = "https://github.com/qoh/ca"
+keywords = ["cli", "math", "terminal", "utility", "term"]
+categories = ["command-line-interface", "command-line-utilities", "science"]
 
 [dependencies]
 num = "0.1.37"
