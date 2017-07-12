@@ -10,5 +10,5 @@ keywords = ["cli", "math", "terminal", "utility", "term"]
 categories = ["command-line-interface", "command-line-utilities", "science"]
 
 [dependencies]
-num = "0.1.37"
+num = "0.1.39"
 rustyline = "1.0.0"
