@@ -1,5 +1,5 @@
 use super::parser::{Expr, Op};
-use num::{Signed, ToPrimitive, BigRational};
+use num::{Signed, FromPrimitive, ToPrimitive, BigRational};
 use num::rational::Ratio;
 use num::bigint::ToBigInt;
 
@@ -114,5 +114,28 @@ fn apply_fn(name: &String, operand: &Expr) -> Option<Expr> {
 			return Some(Expr::Number(n.abs()));
 		}
 	}
+    if name == "sqrt" {
+        if let &Expr::Number(ref n) = operand {
+            if n.numer().is_positive() {
+                return Some(Expr::Number(approx_sqrt(10, n)));
+            } else if n.numer().is_negative() {
+                return Some(Expr::BinaryExpr(
+                    Box::new(Expr::Number(approx_sqrt(10, &n.abs()))),
+                    Op::Multiply,
+                    Box::new(Expr::Name(String::from("i")))));
+            }
+        }
+    }
 	None
+}
+
+fn approx_sqrt(iterations: u64, start: &BigRational) -> BigRational {
+    let two = Ratio::from_integer(FromPrimitive::from_u64(2).unwrap());
+    let mut approx = start.clone();
+
+    for i in 0..iterations {
+        approx = (&approx + (start / &approx)) / &two;
+    }
+
+    approx
 }
