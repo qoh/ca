@@ -16,7 +16,7 @@ pub enum Expr {
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Op {
 	Add,
 	Subtract,

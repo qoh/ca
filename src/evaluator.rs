@@ -1,58 +1,63 @@
 use super::parser::{Expr, Op};
-use num::{One, Signed, ToPrimitive, BigRational};
+use num::{One, Signed, ToPrimitive, FromPrimitive, BigRational};
 use num::rational::Ratio;
 use num::bigint::ToBigInt;
 
 use super::context::Context;
 
 use std::collections::HashSet;
+use std::mem::swap;
 
 pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String> {
-    let mut best_expr = expression.clone();
-    let mut best_score = None;
+    let expression = normalize(&expression);
 
-    let mut seen = HashSet::new();
-    let mut stack = Vec::new();
-
-    seen.insert(expression.clone());
-    stack.push(expression);
-
-    loop {
-        let current = match stack.pop() {
-            Some(e) => e,
-            None => break
-        };
-
-        let score = score(&current);
-
-        if best_score == None || best_score.unwrap() > score {
-            best_score = Some(score);
-            best_expr = current.clone();
-        }
-
-        for next in reductions(&current, context).into_iter() {
-            if seen.contains(&next) {
-                continue;
-            }
-
-            seen.insert(next.clone());
-            stack.push(next);
-        }
-    }
-
-    // Ok(Expr::Tuple(vec![]))
-    Ok(best_expr)
+    Ok(expression)
 }
 
-fn score(expr: &Expr) -> i64 {
+fn normalize(expr: &Expr) -> Expr {
+    let neg = BigRational::from_integer(FromPrimitive::from_i64(-1).unwrap());
+
     match expr {
-        &Expr::Number(_) => 1,
-        &Expr::Name(_) => 2,
-        &Expr::Boolean(_) => 1,
-        &Expr::Tuple(_) => 3,
-        &Expr::Assign(_, _) => 4,
-        &Expr::BinaryExpr(ref lhs, ref op, ref rhs) =>
-            1 + score(&**lhs) + score(&**rhs),
+        &Expr::BinaryExpr(ref lhs, ref op, ref rhs) => {
+            let mut lhs = normalize(lhs);
+            let mut op = op.clone();
+            let mut rhs = normalize(rhs);
+
+            if op == Op::Subtract {
+                // (a - b) => (a + (-1 * b))
+                op = Op::Add;
+                rhs = Expr::BinaryExpr(
+                    Box::new(Expr::Number(neg)),
+                    Op::Multiply,
+                    Box::new(rhs));
+            } else if op == Op::Divide {
+                // (a / b) => (a * (b ^ -1))
+                op = Op::Multiply;
+                rhs = Expr::BinaryExpr(
+                    Box::new(rhs),
+                    Op::Exponent,
+                    Box::new(Expr::Number(neg)));
+            }
+
+            if op == Op::Multiply || op == Op::Add {
+                let (new_lhs, new_rhs) = apply_associative(op, lhs, rhs);
+                lhs = new_lhs;
+                rhs = new_rhs;
+            }
+
+            Expr::BinaryExpr(Box::new(lhs), op, Box::new(rhs))
+        },
+        e => e.clone()
+    }
+}
+
+fn apply_associative(op: Op, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
+    match rhs {
+        Expr::BinaryExpr(ref b, ref inner_op, ref c) if inner_op == &op => {
+            let (a, b) = apply_associative(op, lhs, b.as_ref().clone());
+            (Expr::BinaryExpr(Box::new(a), op, Box::new(b)), c.as_ref().clone())
+        },
+        _ => (lhs, rhs)
     }
 }
 
@@ -66,6 +71,17 @@ fn reductions(expr: &Expr, context: &mut Context) -> Vec<Expr> {
         if let &Expr::Number(ref a) = &**lhs {
             if let &Expr::Number(ref b) = &**rhs {
                 vec.push(Expr::Number(a + b));
+            }
+        }
+    }
+
+    // (a * b) -> [a * b]
+    //     where a: Number
+    //     where b: Number
+    if let &Expr::BinaryExpr(ref lhs, Op::Multiply, ref rhs) = expr {
+        if let &Expr::Number(ref a) = &**lhs {
+            if let &Expr::Number(ref b) = &**rhs {
+                vec.push(Expr::Number(a * b));
             }
         }
     }
@@ -88,6 +104,20 @@ fn reductions(expr: &Expr, context: &mut Context) -> Vec<Expr> {
                     b.clone()
                 )),
                 Op::Add,
+                c.clone()));
+        }
+    }
+
+    // a * (b * c) -> (a * b) * c
+    if let &Expr::BinaryExpr(ref a, Op::Multiply, ref rhs) = expr {
+        if let &Expr::BinaryExpr(ref b, Op::Multiply, ref c) = &**rhs {
+            vec.push(Expr::BinaryExpr(
+                Box::new(Expr::BinaryExpr(
+                    a.clone(),
+                    Op::Multiply,
+                    b.clone()
+                )),
+                Op::Multiply,
                 c.clone()));
         }
     }
