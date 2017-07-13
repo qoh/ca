@@ -6,7 +6,7 @@ use std::iter::{Iterator, Peekable};
 use num::{Zero, Signed, Integer, BigRational};
 use num::bigint::{Sign, ToBigInt};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Expr {
 	Number(BigRational),
 	Name(String),
@@ -16,7 +16,7 @@ pub enum Expr {
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Op {
 	Add,
 	Subtract,

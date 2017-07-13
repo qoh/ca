@@ -5,114 +5,144 @@ use num::bigint::ToBigInt;
 
 use super::context::Context;
 
+use std::collections::HashSet;
+
 pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String> {
-	if let Expr::BinaryExpr(lhs, op, rhs) = expression {
-		let lhs = evaluate(*lhs, context)?;
-		let rhs = evaluate(*rhs, context)?;
+    let mut best_expr = expression.clone();
+    let mut best_score = None;
 
-		if let Expr::Number(ref lhs_i) = lhs {
-			if let Expr::Number(ref rhs_i) = rhs {
-				match op {
-					Op::Add => return Ok(Expr::Number(lhs_i + rhs_i)),
-					Op::Subtract => return Ok(Expr::Number(lhs_i - rhs_i)),
-					Op::Multiply => return Ok(Expr::Number(lhs_i * rhs_i)),
-					Op::Adjacent => return Ok(Expr::Number(lhs_i * rhs_i)),
-					Op::Divide => return Ok(Expr::Number(lhs_i / rhs_i)),
-					Op::Modulus => return Ok(Expr::Number(lhs_i % rhs_i)),
-					Op::Exponent => {
-						if let Some(r) = ratio_power(lhs_i, rhs_i) {
-							return Ok(Expr::Number(r));
-						}
-					},
-					Op::Equals => return Ok(Expr::Boolean(lhs_i == rhs_i))
-				}
-			}
-		}
+    let mut seen = HashSet::new();
+    let mut stack = Vec::new();
 
-		if let Expr::Name(ref name) = lhs {
-			if op == Op::Adjacent {
-				if let Some(e) = apply_fn(name, &rhs) {
-					return Ok(e);
-				}
-			}
-		}
+    seen.insert(expression.clone());
+    stack.push(expression);
 
-		return Ok(Expr::BinaryExpr(Box::new(lhs), op, Box::new(rhs)));
-	}
+    loop {
+        let current = match stack.pop() {
+            Some(e) => e,
+            None => break
+        };
 
-	if let Expr::Name(ref name) = expression {
-		if let Some(expr) = context.get(name) {
-			// FIXME: This use of Clone
-			return evaluate(expr, &mut context.evaluate((*name).clone()));
-		}
-	}
+        let score = score(&current);
 
-	if let Expr::Tuple(ref items) = expression {
-		let mut evaluated = Vec::with_capacity(items.len());
+        if best_score == None || best_score.unwrap() > score {
+            best_score = Some(score);
+            best_expr = current.clone();
+        }
 
-		for item in items.iter() {
-			evaluated.push(evaluate((*item).clone(), context)?);
-		}
+        for next in reductions(&current, context).into_iter() {
+            if seen.contains(&next) {
+                continue;
+            }
 
-		return Ok(Expr::Tuple(evaluated));
-	}
+            seen.insert(next.clone());
+            stack.push(next);
+        }
+    }
 
-	Ok(expression)
+    // Ok(Expr::Tuple(vec![]))
+    Ok(best_expr)
 }
 
-fn ratio_power(lhs: &BigRational, rhs: &BigRational) -> Option<BigRational> {
-	if !rhs.is_integer() {
-		println!("Note: Non-integer exponents ({}) are not supported", rhs);
-		return None;
-	}
-
-	let power = rhs.numer().to_i32();
-	let numer = lhs.numer().to_isize();
-	let denom = lhs.denom().to_isize();
-
-	if let (Some(p), Some(n), Some(d)) = (power, numer, denom) {
-		let r = Ratio::new(n, d).pow(p);
-		let numer = r.numer().to_bigint();
-		let denom = r.denom().to_bigint();
-
-		if let (Some(n), Some(d)) = (numer, denom) {
-			return Some(BigRational::new(n, d));
-		}
-	}
-	
-	None
+fn score(expr: &Expr) -> i64 {
+    match expr {
+        &Expr::Number(_) => 1,
+        &Expr::Name(_) => 2,
+        &Expr::Boolean(_) => 1,
+        &Expr::Tuple(_) => 3,
+        &Expr::Assign(_, _) => 4,
+        &Expr::BinaryExpr(ref lhs, ref op, ref rhs) =>
+            1 + score(&**lhs) + score(&**rhs),
+    }
 }
 
-fn apply_fn(name: &String, operand: &Expr) -> Option<Expr> {
-	if name == "floor" {
-		if let &Expr::Number(ref n) = operand {
-			return Some(Expr::Number(n.floor()));
-		}
-	}
-	if name == "ceil" {
-		if let &Expr::Number(ref n) = operand {
-			return Some(Expr::Number(n.ceil()));
-		}
-	}
-	if name == "round" {
-		if let &Expr::Number(ref n) = operand {
-			return Some(Expr::Number(n.round()));
-		}
-	}
-	if name == "trunc" {
-		if let &Expr::Number(ref n) = operand {
-			return Some(Expr::Number(n.trunc()));
-		}
-	}
-	if name == "fract" {
-		if let &Expr::Number(ref n) = operand {
-			return Some(Expr::Number(n.fract()));
-		}
-	}
-	if name == "abs" {
-		if let &Expr::Number(ref n) = operand {
-			return Some(Expr::Number(n.abs()));
-		}
-	}
-	None
+fn reductions(expr: &Expr, context: &mut Context) -> Vec<Expr> {
+    let mut vec = Vec::new();
+
+    // (a + b) -> [a + b]
+    //     where a: Number
+    //     where b: Number
+    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
+        if let &Expr::Number(ref a) = &**lhs {
+            if let &Expr::Number(ref b) = &**rhs {
+                vec.push(Expr::Number(a + b));
+            }
+        }
+    }
+
+    // (a + b) -> (b + a)
+    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
+        vec.push(Expr::BinaryExpr(
+            rhs.clone(),
+            Op::Add,
+            lhs.clone()));
+    }
+
+    // a + (b + c) -> (a + b) + c
+    if let &Expr::BinaryExpr(ref a, Op::Add, ref rhs) = expr {
+        if let &Expr::BinaryExpr(ref b, Op::Add, ref c) = &**rhs {
+            vec.push(Expr::BinaryExpr(
+                Box::new(Expr::BinaryExpr(
+                    a.clone(),
+                    Op::Add,
+                    b.clone()
+                )),
+                Op::Add,
+                c.clone()));
+        }
+    }
+
+    // (a * x) + (b * x) -> (a + b) * x
+    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
+        if let &Expr::BinaryExpr(ref a, Op::Multiply, ref x1) = &**lhs {
+            if let &Expr::BinaryExpr(ref b, Op::Multiply, ref x2) = &**rhs {
+                if x1 == x2 {
+                    vec.push(Expr::BinaryExpr(
+                        Box::new(Expr::BinaryExpr(
+                            a.clone(),
+                            Op::Add,
+                            b.clone()
+                        )),
+                        Op::Multiply,
+                        x1.clone()));
+                }
+            }
+        }
+    }
+
+    // (a x) + (b x) -> (a + b) x
+    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
+        if let &Expr::BinaryExpr(ref a, Op::Adjacent, ref x1) = &**lhs {
+            if let &Expr::BinaryExpr(ref b, Op::Adjacent, ref x2) = &**rhs {
+                if x1 == x2 {
+                    vec.push(Expr::BinaryExpr(
+                        Box::new(Expr::BinaryExpr(
+                            a.clone(),
+                            Op::Add,
+                            b.clone()
+                        )),
+                        Op::Adjacent,
+                        x1.clone()));
+                }
+            }
+        }
+    }
+
+    // Explore subexpressions
+    if let &Expr::BinaryExpr(ref lhs, ref op, ref rhs) = expr {
+        for next in reductions(lhs, context).into_iter() {
+            vec.push(Expr::BinaryExpr(
+                Box::new(next),
+                op.clone(),
+                rhs.clone()));
+        }
+        for next in reductions(rhs, context).into_iter() {
+            vec.push(Expr::BinaryExpr(
+                lhs.clone(),
+                op.clone(),
+                Box::new(next)));
+        }
+    }
+
+    vec
 }
