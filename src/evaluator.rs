@@ -1,5 +1,5 @@
 use super::parser::{Expr, Op};
-use num::{Signed, ToPrimitive, BigRational};
+use num::{One, Signed, ToPrimitive, BigRational};
 use num::rational::Ratio;
 use num::bigint::ToBigInt;
 
@@ -124,6 +124,38 @@ fn reductions(expr: &Expr, context: &mut Context) -> Vec<Expr> {
                         Op::Adjacent,
                         x1.clone()));
                 }
+            }
+        }
+    }
+
+    // (a * x) + x -> ((a + 1) * x)
+    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref x1) = expr {
+        if let &Expr::BinaryExpr(ref a, Op::Multiply, ref x2) = &**lhs {
+            if x1 == x2 {
+                vec.push(Expr::BinaryExpr(
+                    Box::new(Expr::BinaryExpr(
+                        a.clone(),
+                        Op::Add,
+                        Box::new(Expr::Number(BigRational::one()))
+                    )),
+                    Op::Multiply,
+                    x1.clone()));
+            }
+        }
+    }
+
+    // (a x) + x -> ((a + 1) x)
+    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref x1) = expr {
+        if let &Expr::BinaryExpr(ref a, Op::Adjacent, ref x2) = &**lhs {
+            if x1 == x2 {
+                vec.push(Expr::BinaryExpr(
+                    Box::new(Expr::BinaryExpr(
+                        a.clone(),
+                        Op::Add,
+                        Box::new(Expr::Number(BigRational::one()))
+                    )),
+                    Op::Adjacent,
+                    x1.clone()));
             }
         }
     }
