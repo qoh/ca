@@ -1,5 +1,5 @@
 use super::parser::{Expr, Op};
-use num::{One, Signed, ToPrimitive, FromPrimitive, BigRational};
+use num::{Zero, One, Signed, ToPrimitive, FromPrimitive, BigRational};
 use num::rational::Ratio;
 use num::bigint::ToBigInt;
 
@@ -10,6 +10,7 @@ use std::mem::swap;
 
 pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String> {
     let expression = normalize(&expression);
+    let expression = simplify(&expression);
 
     Ok(expression)
 }
@@ -18,10 +19,14 @@ fn normalize(expr: &Expr) -> Expr {
     let neg = BigRational::from_integer(FromPrimitive::from_i64(-1).unwrap());
 
     match expr {
-        &Expr::BinaryExpr(ref lhs, ref op, ref rhs) => {
+        &Expr::BinaryExpr(ref lhs, op, ref rhs) => {
             let mut lhs = normalize(lhs);
-            let mut op = op.clone();
+            let mut op = op;
             let mut rhs = normalize(rhs);
+
+            if op == Op::Adjacent {
+                op = Op::Multiply;
+            }
 
             if op == Op::Subtract {
                 // (a - b) => (a + (-1 * b))
@@ -51,7 +56,7 @@ fn normalize(expr: &Expr) -> Expr {
     }
 }
 
-fn apply_associative(op: Op, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
+/*fn apply_associative(op: Op, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
     match rhs {
         Expr::BinaryExpr(ref b, ref inner_op, ref c) if inner_op == &op => {
             let (a, b) = apply_associative(op, lhs, b.as_ref().clone());
@@ -59,152 +64,182 @@ fn apply_associative(op: Op, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
         },
         _ => (lhs, rhs)
     }
+}*/
+fn apply_associative(op: Op, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
+    match lhs {
+        Expr::BinaryExpr(ref a, ref inner_op, ref b) if inner_op == &op => {
+            let (b, rhs) = apply_associative(op, b.as_ref().clone(), rhs);
+            (a.as_ref().clone(), Expr::BinaryExpr(Box::new(b), op, Box::new(rhs)))
+        },
+        _ => (lhs, rhs)
+    }
 }
 
-fn reductions(expr: &Expr, context: &mut Context) -> Vec<Expr> {
-    let mut vec = Vec::new();
+// Assumes that `expr` has already been normalized via `normalize()`
+fn simplify(expr: &Expr) -> Expr {
+    let new_expr = simplify_inner(expr);
+    println!("simplify {} => {}", expr, &new_expr);
+    new_expr
+}
 
-    // (a + b) -> [a + b]
-    //     where a: Number
-    //     where b: Number
-    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
-        if let &Expr::Number(ref a) = &**lhs {
-            if let &Expr::Number(ref b) = &**rhs {
-                vec.push(Expr::Number(a + b));
+fn simplify_inner(expr: &Expr) -> Expr {
+    match expr {
+        &Expr::BinaryExpr(_, Op::Add, _) => simplify_add(expr),
+        &Expr::BinaryExpr(_, Op::Multiply, _) => simplify_multiply(expr),
+        _ => expr.clone()
+    }
+}
+
+fn simplify_add(expr: &Expr) -> Expr {
+    let mut items = Vec::new();
+    let mut current = expr.clone();
+
+    while let Expr::BinaryExpr(lhs, Op::Add, rhs) = current {
+        items.push(*lhs);
+        current = *rhs;
+    }
+
+    items.push(current);
+
+    let mut coefficients = vec![BigRational::from_integer(FromPrimitive::from_u64(1).unwrap()); items.len()];
+
+    for i in 0..items.len() {
+        let mut new = simplify(&items[i]);
+
+        new = if let Expr::BinaryExpr(ref l, Op::Multiply, ref f) = new {
+            if let Expr::Number(ref c) = **l {
+                coefficients[i] = c.clone();
+                f.as_ref().clone()
+            } else {
+                new.clone()
+            }
+        } else {
+            new.clone()
+        };
+
+        items[i] = new;
+    }
+
+    for i in 0..items.len() {
+        if !coefficients[i].is_zero() {
+            for j in i+1..items.len() {
+                if items[i] == items[j] {
+                    coefficients[i] = &coefficients[i] + &coefficients[j];
+                    coefficients[j] = BigRational::zero();
+                }
             }
         }
     }
 
-    // (a * b) -> [a * b]
-    //     where a: Number
-    //     where b: Number
-    if let &Expr::BinaryExpr(ref lhs, Op::Multiply, ref rhs) = expr {
-        if let &Expr::Number(ref a) = &**lhs {
-            if let &Expr::Number(ref b) = &**rhs {
-                vec.push(Expr::Number(a * b));
-            }
-        }
-    }
+    let mut replacement = Vec::new();
+    let mut sum = BigRational::zero();
 
-    // (a + b) -> (b + a)
-    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
-        vec.push(Expr::BinaryExpr(
-            rhs.clone(),
-            Op::Add,
-            lhs.clone()));
-    }
-
-    // a + (b + c) -> (a + b) + c
-    if let &Expr::BinaryExpr(ref a, Op::Add, ref rhs) = expr {
-        if let &Expr::BinaryExpr(ref b, Op::Add, ref c) = &**rhs {
-            vec.push(Expr::BinaryExpr(
-                Box::new(Expr::BinaryExpr(
-                    a.clone(),
-                    Op::Add,
-                    b.clone()
-                )),
-                Op::Add,
-                c.clone()));
-        }
-    }
-
-    // a * (b * c) -> (a * b) * c
-    if let &Expr::BinaryExpr(ref a, Op::Multiply, ref rhs) = expr {
-        if let &Expr::BinaryExpr(ref b, Op::Multiply, ref c) = &**rhs {
-            vec.push(Expr::BinaryExpr(
-                Box::new(Expr::BinaryExpr(
-                    a.clone(),
-                    Op::Multiply,
-                    b.clone()
-                )),
+    for i in 0..coefficients.len() {
+        if let Expr::Number(ref n) = items[i] {
+            sum = sum + &coefficients[i] * n;
+        } else if coefficients[i] == BigRational::one() {
+            replacement.push((&items[i]).clone());
+        } else if coefficients[i] != BigRational::zero() {
+            replacement.push(Expr::BinaryExpr(
+                Box::new(Expr::Number((&coefficients[i]).clone())),
                 Op::Multiply,
-                c.clone()));
+                Box::new((&items[i]).clone())
+            ));
         }
     }
 
-    // (a * x) + (b * x) -> (a + b) * x
-    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
-        if let &Expr::BinaryExpr(ref a, Op::Multiply, ref x1) = &**lhs {
-            if let &Expr::BinaryExpr(ref b, Op::Multiply, ref x2) = &**rhs {
-                if x1 == x2 {
-                    vec.push(Expr::BinaryExpr(
-                        Box::new(Expr::BinaryExpr(
-                            a.clone(),
-                            Op::Add,
-                            b.clone()
-                        )),
-                        Op::Multiply,
-                        x1.clone()));
+    if sum != BigRational::zero() {
+        replacement.insert(0, Expr::Number(sum));
+    }
+
+    let mut result = replacement.pop().unwrap(); // bad unwrap
+
+    while let Some(next_result) = replacement.pop() {
+        result = Expr::BinaryExpr(
+            Box::new(next_result),
+            Op::Add,
+            Box::new(result));
+    }
+
+    result
+}
+
+fn simplify_multiply(expr: &Expr) -> Expr {
+    let mut items = Vec::new();
+    let mut current = expr.clone();
+
+    while let Expr::BinaryExpr(lhs, Op::Multiply, rhs) = current {
+        items.push(*lhs);
+        current = *rhs;
+    }
+
+    items.push(current);
+
+    let mut terms: Vec<(BigRational, Expr, BigRational)> = items.iter().map(|i| (BigRational::one(), simplify(i), BigRational::one())).collect();
+    let mut coeff = BigRational::one();
+
+    for i in 0..terms.len() {
+        let mut new = (&terms[i]).clone();
+
+        if let Expr::Number(ref n) = terms[i].1 {
+            coeff = &coeff * n;
+            new.0 = BigRational::zero();
+        } else if let Expr::BinaryExpr(_, Op::Multiply, _) = terms[i].1 {
+            panic!("multiply");
+        } else if let Expr::BinaryExpr(_, Op::Exponent, _) = terms[i].1 {
+            panic!("exponent");
+        }
+        // shouldn't be a need to handle multiply, but do so here
+        // handle exponent here
+
+        terms[i] = new;
+    }
+
+    for i in 0..terms.len() {
+        if !(&terms[i]).0.is_zero() {
+            for j in i+1..terms.len() {
+                if (&terms[i]).1 == (&terms[j]).1 {
+                    terms[i].0 = &terms[i].0 * &terms[j].0;
+                    terms[i].2 = &terms[i].2 + &terms[j].2;
+                    terms[j].0 = BigRational::zero();
                 }
             }
         }
     }
 
-    // (a x) + (b x) -> (a + b) x
-    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref rhs) = expr {
-        if let &Expr::BinaryExpr(ref a, Op::Adjacent, ref x1) = &**lhs {
-            if let &Expr::BinaryExpr(ref b, Op::Adjacent, ref x2) = &**rhs {
-                if x1 == x2 {
-                    vec.push(Expr::BinaryExpr(
-                        Box::new(Expr::BinaryExpr(
-                            a.clone(),
-                            Op::Add,
-                            b.clone()
-                        )),
-                        Op::Adjacent,
-                        x1.clone()));
-                }
-            }
-        }
-    }
+    let mut replacement = Vec::new();
 
-    // (a * x) + x -> ((a + 1) * x)
-    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref x1) = expr {
-        if let &Expr::BinaryExpr(ref a, Op::Multiply, ref x2) = &**lhs {
-            if x1 == x2 {
-                vec.push(Expr::BinaryExpr(
-                    Box::new(Expr::BinaryExpr(
-                        a.clone(),
-                        Op::Add,
-                        Box::new(Expr::Number(BigRational::one()))
-                    )),
+    for i in 0..terms.len() {
+        if !(&terms[i]).2.is_zero() {
+            let mut e = (&terms[i]).1.clone();
+
+            if (&terms[i]).2 != BigRational::one() {
+                e = Expr::BinaryExpr(Box::new(e), Op::Exponent, Box::new(Expr::Number((&terms[i]).2.clone())));
+            }
+
+            if (&terms[i]).0 == BigRational::one() {
+                replacement.push(e);
+            } else if !(&terms[i]).0.is_zero() {
+                replacement.push(Expr::BinaryExpr(
+                    Box::new(Expr::Number((&terms[i]).0.clone())),
                     Op::Multiply,
-                    x1.clone()));
+                    Box::new(e)));
             }
         }
     }
 
-    // (a x) + x -> ((a + 1) x)
-    if let &Expr::BinaryExpr(ref lhs, Op::Add, ref x1) = expr {
-        if let &Expr::BinaryExpr(ref a, Op::Adjacent, ref x2) = &**lhs {
-            if x1 == x2 {
-                vec.push(Expr::BinaryExpr(
-                    Box::new(Expr::BinaryExpr(
-                        a.clone(),
-                        Op::Add,
-                        Box::new(Expr::Number(BigRational::one()))
-                    )),
-                    Op::Adjacent,
-                    x1.clone()));
-            }
-        }
+    if coeff != BigRational::one() {
+        replacement.insert(0, Expr::Number(coeff));
     }
 
-    // Explore subexpressions
-    if let &Expr::BinaryExpr(ref lhs, ref op, ref rhs) = expr {
-        for next in reductions(lhs, context).into_iter() {
-            vec.push(Expr::BinaryExpr(
-                Box::new(next),
-                op.clone(),
-                rhs.clone()));
-        }
-        for next in reductions(rhs, context).into_iter() {
-            vec.push(Expr::BinaryExpr(
-                lhs.clone(),
-                op.clone(),
-                Box::new(next)));
-        }
+    let mut result = replacement.pop().unwrap(); // bad unwrap
+
+    while let Some(next_result) = replacement.pop() {
+        result = Expr::BinaryExpr(
+            Box::new(next_result),
+            Op::Multiply,
+            Box::new(result));
     }
 
-    vec
+    result
 }
