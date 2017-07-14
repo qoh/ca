@@ -16,7 +16,7 @@ pub enum Expr {
 	BinaryExpr(Box<Expr>, Op, Box<Expr>)
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Op {
 	Add,
 	Subtract,
@@ -28,62 +28,107 @@ pub enum Op {
 	Equals
 }
 
+fn op_prec(op: Op) -> u64 {
+    use self::Op::*;
+    match op {
+        Add => 2,
+        Subtract => 1,
+        Multiply => 4,
+        Adjacent => 4,
+        Divide => 3,
+        Modulus => 4,
+        Exponent => 5,
+        Equals => 6
+    }
+}
+
+fn needs_paren(e: &Expr, p: Option<Op>) -> bool {
+    let p = match p {
+        Some(p) => p,
+        None => return false
+    };
+
+    match *e {
+        // needed to avoid confusing (a (-1)) with (a - 1)
+        Expr::Number(ref i) => i.is_negative() && p == Op::Adjacent,
+        Expr::BinaryExpr(_, ref o, _) => op_prec(*o) < op_prec(p),
+        _ => false
+    }
+}
+
+fn display_expr_parent(e: &Expr, f: &mut fmt::Formatter, p: Option<Op>) -> fmt::Result {
+    use std::fmt::Display;
+
+    let needs_paren = needs_paren(e, p);
+    // println!("needs_paren {:?} => {}", e, needs_paren);
+
+    if needs_paren {
+        write!(f, "(")?;
+    }
+
+    match e {
+        &Expr::Number(ref i) => {
+            if f.alternate() {
+                i.fmt(f)
+            } else {
+                fmt_ratio_decimal(i, f)
+            }
+        },
+        &Expr::Name(ref n) => write!(f, "{}", n),
+        &Expr::Boolean(ref b) => write!(f, "{}", b),
+        &Expr::Tuple(ref v) => {
+            write!(f, "(")?;
+
+            let mut it = v.iter().peekable();
+
+            if let Some(e) = it.next() {
+                e.fmt(f)?;
+
+                if it.peek().is_none() {
+                    write!(f, ",")?;
+                }
+            }
+
+            for e in it {
+                write!(f, ",")?;
+                e.fmt(f)?;
+            }
+
+            write!(f, ")")
+        },
+        &Expr::BinaryExpr(ref lhs, Op::Adjacent, ref rhs) => {
+            write!(f, "(")?;
+            lhs.fmt(f)?;
+            write!(f, " ")?;
+            rhs.fmt(f)?;
+            write!(f, ")")
+        },
+        &Expr::Assign(ref lhs, ref rhs) => {
+            write!(f, "(")?;
+            lhs.fmt(f)?;
+            write!(f, " ≔ ")?;
+            rhs.fmt(f)?;
+            write!(f, ")")
+        },
+        &Expr::BinaryExpr(ref lhs, ref op, ref rhs) => {
+            display_expr_parent(lhs.as_ref(), f, Some(*op))?;
+            write!(f, " ")?;
+            op.fmt(f)?;
+            write!(f, " ")?;
+            display_expr_parent(rhs.as_ref(), f, Some(*op))
+        }
+    }?;
+
+    if needs_paren {
+        write!(f, ")")
+    } else {
+        Ok(())
+    }
+}
+
 impl fmt::Display for Expr {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			&Expr::Number(ref i) => {
-				if f.alternate() {
-					i.fmt(f)
-				} else {
-					fmt_ratio_decimal(i, f)
-				}
-			},
-			&Expr::Name(ref n) => write!(f, "{}", n),
-			&Expr::Boolean(ref b) => write!(f, "{}", b),
-			&Expr::Tuple(ref v) => {
-				write!(f, "(")?;
-
-				let mut it = v.iter().peekable();
-
-				if let Some(e) = it.next() {
-					e.fmt(f)?;
-
-					if it.peek().is_none() {
-						write!(f, ",")?;
-					}
-				}
-
-				for e in it {
-					write!(f, ",")?;
-					e.fmt(f)?;
-				}
-
-				write!(f, ")")
-			},
-			&Expr::BinaryExpr(ref lhs, Op::Adjacent, ref rhs) => {
-				write!(f, "(")?;
-				lhs.fmt(f)?;
-				write!(f, " ")?;
-				rhs.fmt(f)?;
-				write!(f, ")")
-			},
-			&Expr::Assign(ref lhs, ref rhs) => {
-				write!(f, "(")?;
-				lhs.fmt(f)?;
-				write!(f, " ≔ ")?;
-				rhs.fmt(f)?;
-				write!(f, ")")
-			},
-			&Expr::BinaryExpr(ref lhs, ref op, ref rhs) => {
-				write!(f, "(")?;
-				lhs.fmt(f)?;
-				write!(f, " ")?;
-				op.fmt(f)?;
-				write!(f, " ")?;
-				rhs.fmt(f)?;
-				write!(f, ")")
-			}
-		}
+        display_expr_parent(self, f, None)
 	}
 }
 
