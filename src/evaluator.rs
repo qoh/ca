@@ -204,17 +204,15 @@ fn simplify_add(expr: &Expr) -> Expr {
     let mut replacement = Vec::new();
     let mut sum = BigRational::zero();
 
-    for i in 0..coefficients.len() {
-        if let Expr::Number(ref n) = items[i] {
-            sum = sum + &coefficients[i] * n;
-        } else if coefficients[i] == BigRational::one() {
-            replacement.push((&items[i]).clone());
-        } else if coefficients[i] != BigRational::zero() {
+    for (item, coeff) in items.iter().zip(coefficients) {
+        if let Expr::Number(ref n) = *item {
+            sum = sum + coeff * n;
+        } else if coeff == BigRational::one() {
+            replacement.push(item.clone());
+        } else if coeff != BigRational::zero() {
             replacement.push(Expr::BinaryExpr(
-                Box::new(Expr::Number((&coefficients[i]).clone())),
-                Op::Multiply,
-                Box::new((&items[i]).clone())
-            ));
+                Box::new(Expr::Number(coeff.clone())),
+                Op::Multiply, Box::new(item.clone())));
         }
     }
 
@@ -225,16 +223,21 @@ fn simplify_add(expr: &Expr) -> Expr {
     let mut result = replacement.pop().unwrap(); // bad unwrap
 
     while let Some(next_result) = replacement.pop() {
-        result = Expr::BinaryExpr(
-            Box::new(next_result),
-            Op::Add,
-            Box::new(result));
+        result = Expr::BinaryExpr(Box::new(next_result),
+            Op::Add, Box::new(result));
     }
 
     result
 }
 
 fn simplify_multiply(expr: &Expr) -> Expr {
+    #[derive(Clone)]
+    struct Term {
+        coeff: BigRational,
+        base: Expr,
+        power: BigRational
+    }
+
     let mut items = Vec::new();
     let mut current = expr.clone();
 
@@ -245,32 +248,35 @@ fn simplify_multiply(expr: &Expr) -> Expr {
 
     items.push(current);
 
-    let mut terms: Vec<(BigRational, Expr, BigRational)> = items.iter().map(|i| (BigRational::one(), simplify(i), BigRational::one())).collect();
+    let mut terms: Vec<Term> = items.iter().map(|i| Term {
+        coeff: BigRational::one(),
+        base: simplify(i),
+        power: BigRational::one()}).collect();
     let mut coeff = BigRational::one();
 
-    for i in 0..terms.len() {
-        let mut new = (&terms[i]).clone();
+    for term in &mut terms {
+        let mut new = term.clone();
 
-        if let Expr::Number(ref n) = terms[i].1 {
+        if let Expr::Number(ref n) = term.base {
             coeff = &coeff * n;
-            new.0 = BigRational::zero();
-        } else if let Expr::BinaryExpr(ref a, Op::Exponent, ref b) = terms[i].1 {
+            new.coeff = BigRational::zero();
+        } else if let Expr::BinaryExpr(ref a, Op::Exponent, ref b) = term.base {
             if let Expr::Number(ref n) = **b {
-                new.2 = n.clone();
-                new.1 = (**a).clone();
+                new.power = n.clone();
+                new.base = (**a).clone();
             }
         }
 
-        terms[i] = new;
+        *term = new;
     }
 
     for i in 0..terms.len() {
-        if !(&terms[i]).0.is_zero() {
+        if !terms[i].coeff.is_zero() {
             for j in i+1..terms.len() {
-                if (&terms[i]).1 == (&terms[j]).1 {
-                    terms[i].0 = &terms[i].0 * &terms[j].0;
-                    terms[i].2 = &terms[i].2 + &terms[j].2;
-                    terms[j].0 = BigRational::zero();
+                if terms[i].base == terms[j].base {
+                    terms[i].coeff = &terms[i].coeff * &terms[j].coeff;
+                    terms[i].power = &terms[i].power + &terms[j].power;
+                    terms[j].coeff = BigRational::zero();
                 }
             }
         }
@@ -278,21 +284,21 @@ fn simplify_multiply(expr: &Expr) -> Expr {
 
     let mut replacement = Vec::new();
 
-    for i in 0..terms.len() {
-        if !(&terms[i]).2.is_zero() {
-            let mut e = (&terms[i]).1.clone();
+    for term in terms {
+        if !term.power.is_zero() {
+            let mut e = term.base.clone();
 
-            if (&terms[i]).2 != BigRational::one() {
-                e = Expr::BinaryExpr(Box::new(e), Op::Exponent, Box::new(Expr::Number((&terms[i]).2.clone())));
+            if term.power != BigRational::one() {
+                e = Expr::BinaryExpr(Box::new(e), Op::Exponent,
+                    Box::new(Expr::Number(term.power.clone())));
             }
 
-            if (&terms[i]).0 == BigRational::one() {
+            if term.coeff == BigRational::one() {
                 replacement.push(e);
-            } else if !(&terms[i]).0.is_zero() {
+            } else if !term.coeff.is_zero() {
                 replacement.push(Expr::BinaryExpr(
-                    Box::new(Expr::Number((&terms[i]).0.clone())),
-                    Op::Multiply,
-                    Box::new(e)));
+                    Box::new(Expr::Number(term.coeff.clone())),
+                    Op::Multiply, Box::new(e)));
             }
         }
     }
@@ -304,10 +310,8 @@ fn simplify_multiply(expr: &Expr) -> Expr {
     let mut result = replacement.pop().unwrap(); // bad unwrap
 
     while let Some(next_result) = replacement.pop() {
-        result = Expr::BinaryExpr(
-            Box::new(next_result),
-            Op::Multiply,
-            Box::new(result));
+        result = Expr::BinaryExpr(Box::new(next_result),
+            Op::Multiply, Box::new(result));
     }
 
     result
