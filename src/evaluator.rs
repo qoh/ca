@@ -229,7 +229,10 @@ fn simplify_add(expr: &Expr, context: &mut Context) -> Expr {
         replacement.insert(0, Expr::Number(sum));
     }
 
-    let mut result = replacement.pop().unwrap(); // bad unwrap
+    let mut result = match replacement.pop() {
+        Some(e) => e,
+        None => Expr::Number(BigRational::zero())
+    };
 
     while let Some(next_result) = replacement.pop() {
         result = Expr::BinaryExpr(Box::new(next_result),
@@ -312,11 +315,18 @@ fn simplify_multiply(expr: &Expr, context: &mut Context) -> Expr {
         }
     }
 
+    if coeff == BigRational::zero() {
+        return Expr::Number(coeff);
+    }
+
     if coeff != BigRational::one() {
         replacement.insert(0, Expr::Number(coeff));
     }
 
-    let mut result = replacement.pop().unwrap(); // bad unwrap
+    let mut result = match replacement.pop() {
+        Some(e) => e,
+        None => Expr::Number(BigRational::one())
+    };
 
     while let Some(next_result) = replacement.pop() {
         result = Expr::BinaryExpr(Box::new(next_result),
