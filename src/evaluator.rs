@@ -5,12 +5,9 @@ use num::bigint::ToBigInt;
 
 use super::context::Context;
 
-use std::collections::HashSet;
-use std::mem::swap;
-
 pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String> {
     let expression = normalize(&expression);
-    let expression = simplify(&expression);
+    let expression = simplify(&expression, context);
 
     Ok(expression)
 }
@@ -18,8 +15,8 @@ pub fn evaluate(expression: Expr, context: &mut Context) -> Result<Expr, String>
 fn normalize(expr: &Expr) -> Expr {
     let neg = BigRational::from_integer(FromPrimitive::from_i64(-1).unwrap());
 
-    match expr {
-        &Expr::BinaryExpr(ref lhs, op, ref rhs) => {
+    match *expr {
+        Expr::BinaryExpr(ref lhs, op, ref rhs) => {
             let mut lhs = normalize(lhs);
             let mut op = op;
             let mut rhs = normalize(rhs);
@@ -65,7 +62,10 @@ fn normalize(expr: &Expr) -> Expr {
 
             Expr::BinaryExpr(Box::new(lhs), op, Box::new(rhs))
         },
-        e => e.clone()
+        Expr::Assign(ref a, ref b) => Expr::Assign(
+            Box::new(normalize(a.as_ref())),
+            Box::new(normalize(b.as_ref()))),
+        ref e => e.clone()
     }
 }
 
@@ -89,8 +89,8 @@ fn apply_associative(op: Op, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
 }
 
 // Assumes that `expr` has already been normalized via `normalize()`
-fn simplify(expr: &Expr) -> Expr {
-    let new_expr = simplify_inner(expr);
+fn simplify(expr: &Expr, context: &mut Context) -> Expr {
+    let new_expr = simplify_inner(expr, context);
 
     if expr != &new_expr  {
         // println!("simplify {} => {}", expr, &new_expr);
@@ -99,13 +99,22 @@ fn simplify(expr: &Expr) -> Expr {
     new_expr
 }
 
-fn simplify_inner(expr: &Expr) -> Expr {
+fn simplify_inner(expr: &Expr, context: &mut Context) -> Expr {
     match *expr {
-        Expr::BinaryExpr(_, Op::Add, _) => simplify_add(expr),
-        Expr::BinaryExpr(_, Op::Multiply, _) => simplify_multiply(expr),
+        Expr::Name(ref n) => {
+            return match context.get(n) {
+                Some(e) => simplify(&e, &mut context.evaluate(n.clone())),
+                None => expr.clone()
+            };
+        },
+        Expr::Assign(ref a, ref b) => Expr::Assign(
+            Box::new(simplify_inner(a.as_ref(), context)),
+            Box::new(simplify_inner(b.as_ref(), context))),
+        Expr::BinaryExpr(_, Op::Add, _) => simplify_add(expr, context),
+        Expr::BinaryExpr(_, Op::Multiply, _) => simplify_multiply(expr, context),
         Expr::BinaryExpr(ref a, Op::Exponent, ref b) => {
-            let a = simplify(a);
-            let b = simplify(b);
+            let a = simplify(a, context);
+            let b = simplify(b, context);
 
             if let Expr::Number(ref a) = a {
                 if let Expr::Number(ref b) = b {
@@ -160,7 +169,7 @@ fn real_power(a: &BigRational, b: &BigRational) -> Option<BigRational> {
     None
 }
 
-fn simplify_add(expr: &Expr) -> Expr {
+fn simplify_add(expr: &Expr, context: &mut Context) -> Expr {
     let mut items = Vec::new();
     let mut current = expr.clone();
 
@@ -174,7 +183,7 @@ fn simplify_add(expr: &Expr) -> Expr {
     let mut coefficients = vec![BigRational::from_integer(FromPrimitive::from_u64(1).unwrap()); items.len()];
 
     for i in 0..items.len() {
-        let mut new = simplify(&items[i]);
+        let mut new = simplify(&items[i], context);
 
         new = if let Expr::BinaryExpr(ref l, Op::Multiply, ref f) = new {
             if let Expr::Number(ref c) = **l {
@@ -230,7 +239,7 @@ fn simplify_add(expr: &Expr) -> Expr {
     result
 }
 
-fn simplify_multiply(expr: &Expr) -> Expr {
+fn simplify_multiply(expr: &Expr, context: &mut Context) -> Expr {
     #[derive(Clone)]
     struct Term {
         coeff: BigRational,
@@ -250,7 +259,7 @@ fn simplify_multiply(expr: &Expr) -> Expr {
 
     let mut terms: Vec<Term> = items.iter().map(|i| Term {
         coeff: BigRational::one(),
-        base: simplify(i),
+        base: simplify(i, context),
         power: BigRational::one()}).collect();
     let mut coeff = BigRational::one();
 

@@ -55,7 +55,8 @@ fn input(line: &String, scope: &mut context::Scope, align: bool) {
 
     if let parser::Expr::Assign(lhs, rhs) = expression {
         if let parser::Expr::Name(ref name) = *lhs {
-            context.insert((*name).clone(), *rhs);
+            let rhs = evaluator::evaluate(*rhs, &mut context).ok().unwrap();
+            context.insert((*name).clone(), rhs);
         } else {
             println!("Error: Cannot assign to {}", lhs);
         }
